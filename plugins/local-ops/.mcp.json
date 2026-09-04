@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "local_ops": {
+      "command": "node",
+      "args": [
+        "./server.mjs"
+      ],
+      "cwd": ".",
+      "env": {
+        "LOCAL_OPS_ROOT": ".",
+        "LOCAL_OPS_GIT_READ": "true",
+        "LOCAL_OPS_GIT_WRITE": "true",
+        "LOCAL_OPS_GIT_REMOTE": "false",
+        "LOCAL_OPS_GIT_FETCH": "true",
+        "LOCAL_OPS_GIT_PULL": "false",
+        "LOCAL_OPS_GIT_PUSH": "false"
+      },
+      "enabled": true,
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 60
+    }
+  }
+}

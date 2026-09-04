@@ -1,0 +1,28 @@
+{
+  "name": "local-ops",
+  "version": "0.3.0",
+  "description": "Scoped local file and Git operations for ChatGPT through MCP.",
+  "license": "MIT",
+  "author": {
+    "name": "Local Ops contributors"
+  },
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Local Ops",
+    "shortDescription": "Manage files and local Git in one folder.",
+    "longDescription": "Adds scoped file operations plus switch-controlled local and remote Git tools through a local MCP server.",
+    "developerName": "Local Ops contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Git"
+    ],
+    "defaultPrompt": [
+      "List the files available in my local workspace.",
+      "Update a file after reading its current contents.",
+      "Show Git status and, when enabled, sync the current branch."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Runtime and download caches
+work/
+bin/tunnel-client.exe
+*.log
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+config/local-ops.psd1
+
+# Editor and operating-system files
+.obsidian/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
