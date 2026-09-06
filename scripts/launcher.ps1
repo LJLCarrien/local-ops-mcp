@@ -1,7 +1,10 @@
+param(
+    [string]$ConfigPath = (Join-Path $PSScriptRoot '..\config\local-ops.psd1')
+)
+
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = Split-Path -Parent $PSScriptRoot
-$configurationPath = Join-Path $repositoryRoot 'config\local-ops.psd1'
+$configurationPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ConfigPath)
 $zhFirstTimeSetup = -join [char[]](0x9996, 0x6B21, 0x914D, 0x7F6E)
 $zhStart = -join [char[]](0x542F, 0x52A8)
 $zhReinitialize = -join [char[]](0x91CD, 0x65B0, 0x521D, 0x59CB, 0x5316, 0x914D, 0x7F6E)
@@ -32,7 +35,9 @@ function Start-LocalOpsPowerShell {
         '-ExecutionPolicy',
         'Bypass',
         '-File',
-        $quotedScriptPath
+        $quotedScriptPath,
+        '-ConfigPath',
+        ('"' + $configurationPath + '"')
     ) + $ScriptArguments
     Start-Process -FilePath 'powershell.exe' -ArgumentList $argumentList -WindowStyle Normal
 

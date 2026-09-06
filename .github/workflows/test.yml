@@ -29,3 +29,8 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Test PowerShell config paths
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/test-config-path.ps1

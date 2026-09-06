@@ -186,3 +186,15 @@ tunnel-client started
 - ChatGPT 仍显示旧工具，或开关关闭后网页仍显示该工具：服务端策略在 Tunnel 重启后已经生效；先在连接器详情页刷新应用。若实测仍未更新，再删除旧连接器定义并用原 Tunnel ID 重新创建；
 - 应用显示“未安装”或“未连接”：需要在 ChatGPT 中完成安装和连接；
 - 当前对话没有工具：新建对话，并在发送消息时选择正确应用。
+
+## 将本机配置放在代码目录之外
+
+`launcher.ps1`、`first-time-setup.ps1`、`setup-tunnel.ps1` 和 `run-tunnel.ps1` 都接受 `-ConfigPath`。适合将公开代码作为子模块使用、私人配置留在外层目录的情况：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -ConfigPath ..\private-config\local-ops.psd1
+```
+
+菜单会把选定的配置路径传给首次配置、启动和重新初始化操作；首次配置向导会在该位置读取或创建配置。路径可以包含空格，命令行中需用引号包围。未指定参数时仍使用代码目录下的 `config/local-ops.psd1`。真实配置和 Runtime API Key 不应提交到公开仓库。
+
+维护者可运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-path.ps1` 验证路径传递；此测试使用模拟 Tunnel，不需要凭据。

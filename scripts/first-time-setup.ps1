@@ -1,10 +1,13 @@
-param([switch]$Reinitialize)
+param(
+    [switch]$Reinitialize,
+    [string]$ConfigPath = (Join-Path $PSScriptRoot '..\config\local-ops.psd1')
+)
 
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$configDir = Join-Path $projectRoot 'config'
-$configPath = Join-Path $configDir 'local-ops.psd1'
+$configPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ConfigPath)
+$configDir = Split-Path -Parent $configPath
 $setupScript = Join-Path $PSScriptRoot 'setup-tunnel.ps1'
 $runScript = Join-Path $PSScriptRoot 'run-tunnel.ps1'
 . (Join-Path $PSScriptRoot 'tunnel-client.ps1')
