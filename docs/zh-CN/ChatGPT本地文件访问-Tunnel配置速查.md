@@ -198,3 +198,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -
 菜单会把选定的配置路径传给首次配置、启动和重新初始化操作；首次配置向导会在该位置读取或创建配置。路径可以包含空格，命令行中需用引号包围。未指定参数时仍使用代码目录下的 `config/local-ops.psd1`。真实配置和 Runtime API Key 不应提交到公开仓库。
 
 维护者可运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-path.ps1` 验证路径传递；此测试使用模拟 Tunnel，不需要凭据。
+
+## 启动前选择配置
+
+给 launcher.ps1 加上 `-SelectConfig`，会先列出 `-ConfigPath` 所在目录中的 `.psd1` 文件（不递归，排除 `*.example.psd1` 模板）。例如：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -ConfigPath ..\private-config\local-ops.psd1 -SelectConfig
+```
+
+输入编号选择文件，回车使用 ConfigPath 指定的默认文件，Q 退出。配置列表只展示文件名，不读取或打印其中的凭据。没有配置时直接进入操作菜单，可用首次配置创建默认文件。菜单显示当前选中的完整路径；首次配置、启动和重新初始化都使用该路径。不加 SelectConfig 时保留原来的固定路径行为。
+
+可以在私人配置目录准备 `work.psd1`、`personal.psd1` 等文件，分别填写 WorkspaceRoot。再次打开菜单即可重新选择；不会记住或自动覆盖默认配置。切换前先关闭之前的 Tunnel 窗口，菜单不会停止已有进程。若使用不同 TunnelId，请为每个 Tunnel 使用独立 Profile，并先用所选配置执行重新初始化；单纯选择文件不会重建 Tunnel profile。
+
+配置选择测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-selection.ps1`，不需要真实凭据或 Tunnel。

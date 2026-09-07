@@ -1,10 +1,44 @@
 param(
-    [string]$ConfigPath = (Join-Path $PSScriptRoot '..\config\local-ops.psd1')
+    [string]$ConfigPath = (Join-Path $PSScriptRoot '..\config\local-ops.psd1'),
+    [switch]$SelectConfig
 )
 
 $ErrorActionPreference = 'Stop'
 
 $configurationPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ConfigPath)
+
+if ($SelectConfig) {
+    $configDirectory = Split-Path -Parent $configurationPath
+    $configurations = @()
+    if (Test-Path -LiteralPath $configDirectory -PathType Container) {
+        $configurations = @(Get-ChildItem -LiteralPath $configDirectory -File -Filter '*.psd1' |
+            Where-Object { $_.Name -notlike '*.example.psd1' } | Sort-Object Name)
+    }
+    if ($configurations.Count -gt 0) {
+        Write-Host ''
+        $zhSelectConfig = -join [char[]](0x9009, 0x62E9, 0x914D, 0x7F6E)
+        Write-Host "$zhSelectConfig / Select configuration" -ForegroundColor Cyan
+        Write-Host "Directory: $configDirectory"
+        for ($i = 0; $i -lt $configurations.Count; $i++) {
+            Write-Host "[$($i + 1)] $($configurations[$i].Name)"
+        }
+        Write-Host "[Enter] $([IO.Path]::GetFileName($configurationPath)) (default)"
+        Write-Host '[Q] Quit'
+        while ($true) {
+            $answer = (Read-Host 'Choose configuration number, Enter for default, or Q').Trim()
+            if ($answer -ieq 'q') { return }
+            if (-not $answer) { break }
+            $number = 0
+            if ([int]::TryParse($answer, [ref]$number) -and $number -ge 1 -and $number -le $configurations.Count) {
+                $configurationPath = $configurations[$number - 1].FullName
+                break
+            }
+            Write-Host 'Invalid configuration number. Try again.' -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host 'No saved configurations found. Choose first-time setup to create the default configuration.' -ForegroundColor Yellow
+    }
+}
 $zhFirstTimeSetup = -join [char[]](0x9996, 0x6B21, 0x914D, 0x7F6E)
 $zhStart = -join [char[]](0x542F, 0x52A8)
 $zhReinitialize = -join [char[]](0x91CD, 0x65B0, 0x521D, 0x59CB, 0x5316, 0x914D, 0x7F6E)
@@ -59,6 +93,7 @@ function Confirm-LocalConfiguration {
 Write-Host ''
 Write-Host 'Local Ops' -ForegroundColor Cyan
 Write-Host '========='
+Write-Host "Config: $configurationPath"
 Write-Host "[1] $zhFirstTimeSetup / First-time setup"
 Write-Host "[2] $zhStart Tunnel / Start Tunnel"
 Write-Host "[3] $zhReinitialize / Reinitialize configuration"

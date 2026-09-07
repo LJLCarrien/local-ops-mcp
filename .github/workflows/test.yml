@@ -33,4 +33,6 @@ jobs:
       - name: Test PowerShell config paths
         if: runner.os == 'Windows'
         shell: powershell
-        run: ./scripts/test-config-path.ps1
+        run: |
+          ./scripts/test-config-path.ps1
+          ./scripts/test-config-selection.ps1
