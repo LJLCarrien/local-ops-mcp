@@ -212,3 +212,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -
 可以在私人配置目录准备 `work.psd1`、`personal.psd1` 等文件，分别填写 WorkspaceRoot。再次打开菜单即可重新选择；不会记住或自动覆盖默认配置。切换前先关闭之前的 Tunnel 窗口，菜单不会停止已有进程。若使用不同 TunnelId，请为每个 Tunnel 使用独立 Profile，并先用所选配置执行重新初始化；单纯选择文件不会重建 Tunnel profile。
 
 配置选择测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-selection.ps1`，不需要真实凭据或 Tunnel。
+
+配置向导编辑已有文件时，会保留未修改字段、Git 权限开关和注释；每次覆盖前在原文件旁创建唯一命名的 `.bak` 备份。代理输入回车保留原值，输入 `none` 清空。`first-time-setup.ps1 -EditOnly -ConfigPath <配置文件>` 只编辑，不调用 Tunnel 初始化。配置文件无效时停止，不覆盖原文件。

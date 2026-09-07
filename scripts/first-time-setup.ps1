@@ -1,5 +1,6 @@
 param(
     [switch]$Reinitialize,
+    [switch]$EditOnly,
     [string]$ConfigPath = (Join-Path $PSScriptRoot '..\config\local-ops.psd1')
 )
 
@@ -11,6 +12,7 @@ $configDir = Split-Path -Parent $configPath
 $setupScript = Join-Path $PSScriptRoot 'setup-tunnel.ps1'
 $runScript = Join-Path $PSScriptRoot 'run-tunnel.ps1'
 . (Join-Path $PSScriptRoot 'tunnel-client.ps1')
+. (Join-Path $PSScriptRoot 'local-config.ps1')
 
 function Read-RequiredValue {
     param(
@@ -25,11 +27,6 @@ function Read-RequiredValue {
         if ($value) { return $value.Trim() }
         Write-Host 'A value is required.' -ForegroundColor Yellow
     }
-}
-
-function Escape-Psd1String {
-    param([string]$Value)
-    return $Value.Replace("'", "''")
 }
 
 function Install-TunnelClientInteractively {
@@ -70,16 +67,16 @@ function Install-TunnelClientInteractively {
 Write-Host ''
 $modeLabel = if ($Reinitialize) { 'reconfiguration' } else { 'first-time setup' }
 Write-Host "Local Ops $modeLabel" -ForegroundColor Cyan
-Write-Host 'This wizard updates the Git-ignored local config, initializes the tunnel, and can start it.'
+Write-Host $(if ($EditOnly) { 'Edit configuration only; Tunnel initialization is a separate operation.' } else { 'This wizard updates the local config, initializes the tunnel, and can start it.' })
 Write-Host 'The Runtime API key will not be written to disk.' -ForegroundColor Green
 Write-Host ''
 
-$tunnelClient = try {
+$tunnelClient = if (-not $EditOnly) { try {
     Resolve-TunnelClient
 } catch {
     Write-Host 'The official OpenAI tunnel-client is not installed on this computer.' -ForegroundColor Yellow
     Install-TunnelClientInteractively
-}
+} }
 Write-Host "Official tunnel-client: $tunnelClient" -ForegroundColor Green
 
 $existing = @{}
@@ -100,51 +97,35 @@ while ($true) {
     Write-Host 'Tunnel ID must start with tunnel_ and contain only letters and numbers after it.' -ForegroundColor Yellow
 }
 
-$defaultProxyPort = ''
-if ($existing.ProxyUrl -match '^http://127\.0\.0\.1:(\d+)$') {
-    $defaultProxyPort = $Matches[1]
+$proxyInput = (Read-Host 'Proxy: Enter keeps current value; enter a local port or HTTP(S) URL; "none" clears it').Trim()
+$proxyUrl = [string]$existing.ProxyUrl
+if ($proxyInput -ieq 'none') { $proxyUrl = '' }
+elseif ($proxyInput -match '^\d{1,5}$' -and [int]$proxyInput -ge 1 -and [int]$proxyInput -le 65535) { $proxyUrl = "http://127.0.0.1:$proxyInput" }
+elseif ($proxyInput) {
+    $proxyUri = $null
+    if (-not [Uri]::TryCreate($proxyInput, [UriKind]::Absolute, [ref]$proxyUri) -or $proxyUri.Scheme -notin @('http','https')) { throw 'Proxy must be a port from 1 to 65535, an HTTP(S) URL, or none.' }
+    $proxyUrl = $proxyInput
 }
-$proxyPort = Read-Host $(if ($defaultProxyPort) { "Local HTTP or mixed proxy port; leave blank to keep $defaultProxyPort" } else { 'Local HTTP or mixed proxy port; leave blank for no proxy' })
-if (-not $proxyPort) { $proxyPort = $defaultProxyPort }
-if ($proxyPort -and $proxyPort -notmatch '^\d{1,5}$') {
-    throw "Proxy port must be blank or a number: '$proxyPort'"
-}
-$proxyUrl = if ($proxyPort) { "http://127.0.0.1:$proxyPort" } else { '' }
 
 $profile = Read-RequiredValue -Prompt 'Local tunnel profile name' -DefaultValue $(if ($existing.Profile) { $existing.Profile } else { 'local-ops' })
 
 $nodePath = $existing.NodePath
 if ($nodePath -and -not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
-    Write-Host "Configured Node.js was not found; automatic detection will be used instead: '$nodePath'" -ForegroundColor Yellow
-    $nodePath = ''
+    Write-Host "Configured Node.js was not found: '$nodePath'. The saved value will be preserved." -ForegroundColor Yellow
 }
 
 $bundledNode = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 $detectedNode = if ($nodePath) { $nodePath } elseif (Test-Path -LiteralPath $bundledNode -PathType Leaf) { $bundledNode } else { (Get-Command node.exe -ErrorAction SilentlyContinue).Source }
-if (-not $detectedNode) {
+if (-not $EditOnly -and -not $detectedNode) {
     throw 'Node.js was not found. Install Node.js or Codex before continuing.'
 }
-if ($detectedNode -match '\s') {
+if (-not $EditOnly -and $detectedNode -match '\s') {
     throw "The detected Node.js path contains spaces and cannot be used safely by this tunnel-client version: '$detectedNode'. Install Codex, or place Node.js in a path without spaces and set NodePath in config/local-ops.psd1."
 }
 
-New-Item -ItemType Directory -Force -Path $configDir | Out-Null
-$configText = @"
-@{
-    WorkspaceRoot = '$(Escape-Psd1String $workspaceRoot)'
-    TunnelId     = '$(Escape-Psd1String $tunnelId)'
-    ProxyUrl     = '$(Escape-Psd1String $proxyUrl)'
-    Profile      = '$(Escape-Psd1String $profile)'
-    NodePath     = '$(Escape-Psd1String $nodePath)'
-    GitRead      = `$true
-    GitWrite     = `$true
-    GitRemote    = `$false
-    GitFetch     = `$true
-    GitPull      = `$false
-    GitPush      = `$false
+Save-LocalOpsConfiguration -Path $configPath -Updates @{
+    WorkspaceRoot = $workspaceRoot; TunnelId = $tunnelId; ProxyUrl = $proxyUrl; Profile = $profile; NodePath = $nodePath
 }
-"@
-Set-Content -LiteralPath $configPath -Value $configText -Encoding UTF8
 
 Write-Host ''
 Write-Host "Local config saved to '$configPath'." -ForegroundColor Green
@@ -153,6 +134,7 @@ Write-Host "Tunnel:    $tunnelId"
 Write-Host "Proxy:     $(if ($proxyUrl) { $proxyUrl } else { '(direct connection)' })"
 Write-Host "Profile:   $profile"
 Write-Host ''
+if ($EditOnly) { Write-Host 'Configuration saved. Tunnel initialization was not run.'; return }
 Write-Host 'Starting tunnel initialization. Paste the Runtime API key when prompted.' -ForegroundColor Cyan
 
 & $setupScript -ConfigPath $configPath -TunnelClient $tunnelClient
