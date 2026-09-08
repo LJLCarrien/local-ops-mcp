@@ -127,10 +127,10 @@ tunnel-client started
 
 | 配置项 | 从哪里得到 | 忘了怎么办 | 修改后 |
 |---|---|---|---|
-| `WorkspaceRoot` | 自己选择的本地项目文件夹 | 在资源管理器地址栏复制完整路径 | 重新初始化 |
-| `TunnelId` | OpenAI Platform 的 Tunnels 页面 | 回页面查看 `ID` 列 | 必须重新初始化 |
-| `ProxyUrl` | 代理软件的 HTTP/Mixed 端口 | 打开代理软件查看本地端口 | 建议重新初始化并运行 doctor |
-| `Profile` | 自己起的本机配置昵称 | 不确定时用 `local-ops` | 必须重新初始化 |
+| `WorkspaceRoot` | 自己选择的本地项目文件夹 | 在资源管理器地址栏复制完整路径 | 关闭旧 Tunnel 后重新启动 |
+| `TunnelId` | OpenAI Platform 的 Tunnels 页面 | 回页面查看 `ID` 列 | 更换独立 Profile 并初始化 |
+| `ProxyUrl` | 代理软件的 HTTP/Mixed 端口 | 打开代理软件查看本地端口 | 重新启动 |
+| `Profile` | 自己起的本机配置昵称 | 使用向导建议的独立名称 | 新 Profile 需初始化 |
 | `NodePath` | Node.js 可执行文件路径 | 通常留空自动检测 | 重新初始化 |
 | Runtime API Key | OpenAI Platform 的 Runtime API Keys 页面 | 旧值通常不可找回，应新建并撤销旧密钥 | 在脚本提示时输入，不写入配置 |
 
@@ -148,7 +148,7 @@ tunnel-client started
 
 ### Profile 与 NodePath
 
-`Profile` 只是本机配置昵称，只有一套配置时使用 `local-ops` 即可。`NodePath` 通常留空；自动检测失败时，可填写不含空格的 Node.js 可执行文件路径。
+`Profile` 是本机 Tunnel 配置名称。向导根据配置文件名和 Tunnel ID 生成独立默认名；不同 Tunnel 不要共用同一个 Profile。`NodePath` 通常留空；自动检测失败时，可填写不含空格的 Node.js 可执行文件路径。
 
 ### Runtime API Key
 
@@ -156,30 +156,17 @@ tunnel-client started
 
 ## 什么时候需要重新初始化
 
-最简单的判断是：
+菜单中的三个操作已分开：
 
-```text
-配置没改：只启动
-配置改了：重新初始化，成功后再启动
-看不懂 Profile 或 configuration 错误：重新初始化
-```
+- `1. Create or edit configuration`：新建或编辑所选配置；不连接 Tunnel。保留未编辑字段、Git 权限和注释，覆盖前自动保存 `.bak` 备份。
+- `2. Start Tunnel`：先核对 Profile 与所选 TunnelId 的绑定。匹配才启动；缺少 Profile 时询问是否初始化，可取消。
+- `3. Initialize Tunnel`：只读取所选配置，创建或检查 Tunnel profile，不改写私人配置。已有匹配的 profile 会先备份；不覆盖绑定到其他 Tunnel 的 profile。
 
-以下情况通常只需双击 `Local-Ops.bat` 并选择 `2. Start Tunnel`：
+只有新 Profile、Profile 丢失、更换 NodePath 或服务脚本位置等情况需要初始化。同一 Tunnel 只修改 WorkspaceRoot、代理或 Git 权限时，关闭旧 Tunnel 后重新启动即可。更换 TunnelId 时，编辑配置使用新的独立 Profile，再初始化一次。后续选配置即可启动。
 
-- 电脑或 ChatGPT 客户端刚重启；
-- 昨天停止了 Tunnel，今天继续用；
-- Tunnel 窗口被关闭；
-- 代理重新连接，但端口没变；
-- Tunnel 暂时离线，但本地配置没变。
+如果列表显示 Conflict（其他配置用相同 Profile 绑定不同 Tunnel）或 Mismatch（已安装 Profile 绑定另一个 Tunnel），先用操作 1 编辑。向导会建议独立名称；回车接受后，再执行操作 3。不会自动覆盖另一个 Tunnel 的绑定。
 
-以下情况需要双击 `Local-Ops.bat` 并选择 `3. Reinitialize configuration`，成功后再启动：
-
-- 第一次使用，尚未成功初始化；
-- `TunnelId`、`Profile`、`WorkspaceRoot`、`ProxyUrl` 或 `NodePath` 改变；
-- 启动时报 `profile not found`、`configuration invalid`、`doctor failed` 或 `init required`；
-- 换电脑、重建本地配置，或 tunnel-client 的本机 Profile 丢失。
-
-重新初始化向导会显示当前工作区、Tunnel ID、代理端口和 Profile；按 Enter 保留当前值，输入新值即可更新。它用于保存修改、创建或更新 Profile 并执行检查，不代替日常启动。
+旧命令 `first-time-setup.ps1 -Reinitialize -ConfigPath <文件>` 现在也只初始化，不进入编辑问答；`-EditOnly` 只编辑。不带这两个开关直接运行该脚本时，仍支持首次安装的编辑、初始化和可选启动流程。
 
 下面几种情况不是本机初始化问题：
 
@@ -195,22 +182,38 @@ tunnel-client started
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -ConfigPath ..\private-config\local-ops.psd1
 ```
 
-菜单会把选定的配置路径传给首次配置、启动和重新初始化操作；首次配置向导会在该位置读取或创建配置。路径可以包含空格，命令行中需用引号包围。未指定参数时仍使用代码目录下的 `config/local-ops.psd1`。真实配置和 Runtime API Key 不应提交到公开仓库。
+菜单把选定路径传给编辑、启动和初始化操作；编辑向导在该位置读取或创建配置。路径可以包含空格，命令行中需用引号包围。未指定参数时仍使用代码目录下的 `config/local-ops.psd1`。真实配置和 Runtime API Key 不应提交到公开仓库。
 
 维护者可运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-path.ps1` 验证路径传递；此测试使用模拟 Tunnel，不需要凭据。
 
 ## 启动前选择配置
 
-给 launcher.ps1 加上 `-SelectConfig`，会先列出 `-ConfigPath` 所在目录中的 `.psd1` 文件（不递归，排除 `*.example.psd1` 模板）。例如：
+给 launcher.ps1 加上 `-SelectConfig`，会先列出 ConfigPath 所在目录中的 `.psd1` 文件（不递归，排除 `*.example.psd1`）：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -ConfigPath ..\private-config\local-ops.psd1 -SelectConfig
 ```
 
-输入编号选择文件，回车使用 ConfigPath 指定的默认文件，Q 退出。配置列表只展示文件名，不读取或打印其中的凭据。没有配置时直接进入操作菜单，可用首次配置创建默认文件。菜单显示当前选中的完整路径；首次配置、启动和重新初始化都使用该路径。不加 SelectConfig 时保留原来的固定路径行为。
+输入编号选择，回车选择默认文件，Q 退出，N 输入新配置文件名。列表显示文件名、工作区、Profile 和检查状态，不打印 Tunnel ID 或凭据。新建文件要在随后操作菜单选择 1 编辑并保存；同名文件不会被新建操作覆盖。
 
-可以在私人配置目录准备 `work.psd1`、`personal.psd1` 等文件，分别填写 WorkspaceRoot。再次打开菜单即可重新选择；不会记住或自动覆盖默认配置。切换前先关闭之前的 Tunnel 窗口，菜单不会停止已有进程。若使用不同 TunnelId，请为每个 Tunnel 使用独立 Profile，并先用所选配置执行重新初始化；单纯选择文件不会重建 Tunnel profile。
+| 状态 | 含义与操作 |
+|---|---|
+| Ready | 本机绑定已匹配，可以选择启动；不表示网络已经在线 |
+| Missing | 需要初始化；启动时会询问是否执行 |
+| Conflict / Mismatch | 先编辑并选择独立 Profile，再初始化 |
+| Invalid | 配置语法、工作区或必要字段有误，先修正 |
+| Unknown | 无法可靠检查，不启动；检查客户端是否支持 profiles list --json、profile 文件格式和环境覆盖 |
 
-配置选择测试：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-selection.ps1`，不需要真实凭据或 Tunnel。
+绑定检查只接受官方 init 通常生成的简单字面量 YAML；自定义别名、合并、重复字段等无法可靠判断时显示 Unknown。启用了 TUNNEL_CLIENT_CONFIG 或 TUNNEL_CLIENT_PROFILE_FILE 环境覆盖时，也会提示先清除覆盖，避免检查和运行使用不同文件。启动及 doctor 命令显式传递已核对的 profile 文件和 Tunnel ID。
 
-配置向导编辑已有文件时，会保留未修改字段、Git 权限开关和注释；每次覆盖前在原文件旁创建唯一命名的 `.bak` 备份。代理输入回车保留原值，输入 `none` 清空。`first-time-setup.ps1 -EditOnly -ConfigPath <配置文件>` 只编辑，不调用 Tunnel 初始化。配置文件无效时停止，不覆盖原文件。
+可以准备 work.psd1、personal.psd1 等私人配置，每份填写各自的 WorkspaceRoot。菜单不会记住或覆盖默认选择，也不会停止已有进程；切换前先关闭旧 Tunnel 窗口。不加 SelectConfig 则直接使用 ConfigPath 指定的文件。
+
+编辑时代理输入回车保留现值，输入 none 清空。无效配置不会被覆盖。备份保存在原文件旁，文件名带时间和随机后缀并以 .bak 结尾；配置目录中的真实 psd1 文件和备份均被 Git 忽略，公开模板除外。
+
+维护者验证（模拟客户端，不连接真实 Tunnel）：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-path.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-config-selection.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-profile-state.ps1
+```

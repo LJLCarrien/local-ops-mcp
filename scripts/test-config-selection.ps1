@@ -25,7 +25,7 @@ function Test-Selection($DefaultPath, [string[]]$Answers, $ExpectedPath, [switch
     $index = [array]::IndexOf($arguments, '-ConfigPath')
     Assert-True ($index -ge 0) 'No config path was passed.'
     Assert-True ($arguments[$index + 1] -eq ('"' + $ExpectedPath + '"')) 'Wrong selected config path.'
-    Assert-True (($arguments -contains '-Reinitialize') -eq [bool]$Reinitialize) 'Wrong reinitialization mode.'
+    if ($Reinitialize) { Assert-True (($arguments -join ' ') -match 'setup-tunnel.ps1') 'Initialize used the editing wizard.' }
 }
 try {
     $first = Join-Path $fixture 'a.psd1'
@@ -42,6 +42,10 @@ try {
     Test-Selection $first @('garbage', '0', '99', '2147483648', '2', '2') $second
     Test-Selection $first @('', '2') $first
     Test-Selection $first @('q') $null -Cancelled
+    Test-Selection $first @('n', 'fresh workspace', '1') (Join-Path $fixture 'fresh workspace.psd1')
+    Test-Selection $first @('n', '..\escape', 'q') $null -Cancelled
+    Test-Selection $first @('n', 'a.psd1', 'q') $null -Cancelled
+    Test-Selection $first @('n', 'q', 'q') $null -Cancelled
     $missingDefault = Join-Path $fixture 'new.psd1'
     Test-Selection $missingDefault @('', '1') $missingDefault
     $emptyDefault = Join-Path $fixture 'empty\local-ops.psd1'
@@ -51,6 +55,14 @@ try {
     Test-Selection $emptyDefault @('1') $emptyDefault
     Assert-True ((Get-FileHash -LiteralPath $first).Hash -eq $beforeFirst) 'First config was modified.'
     Assert-True ((Get-FileHash -LiteralPath $second).Hash -eq $beforeSecond) 'Second config was modified.'
+    # Exercise the same fresh -File process used by Local-Ops.bat, not only in-process mocks.
+    $escapedFixture = $fixture.Replace("'", "''")
+    Set-Content -LiteralPath $first -Value "@{ WorkspaceRoot = '$escapedFixture'; Profile = 'selection-test'; TunnelId = 'tunnel_A' }"
+    Set-Content -LiteralPath $second -Value "@{ WorkspaceRoot = '$escapedFixture'; Profile = 'selection-test'; TunnelId = 'tunnel_B' }"
+    $output = 'Q' | & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'launcher.ps1') -ConfigPath $first -SelectConfig
+    Assert-True ($LASTEXITCODE -eq 0) 'Fresh launcher process failed.'
+    Assert-True (($output -join "`n") -match '\[Conflict\]') 'Fresh -File process failed to read configuration state.'
+    Assert-True (($output -join "`n") -notmatch '\[Invalid\]') 'Fresh -File process treated valid files as invalid.'
     Write-Host 'Configuration selection tests passed.'
 } finally {
     Remove-Variable -Name LocalOpsSelectionTestArguments -Scope Global -ErrorAction SilentlyContinue

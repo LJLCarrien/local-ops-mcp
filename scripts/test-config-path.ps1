@@ -11,6 +11,7 @@ try {
     New-Item -ItemType Directory -Path $fixtureScripts | Out-Null
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'first-time-setup.ps1') -Destination $fixtureScripts
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'local-config.ps1') -Destination $fixtureScripts
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'profile-state.ps1') -Destination $fixtureScripts
     Set-Content -LiteralPath (Join-Path $fixtureScripts 'tunnel-client.ps1') -Value 'function Resolve-TunnelClient { return "unused-test-client" }'
     Set-Content -LiteralPath (Join-Path $fixtureScripts 'setup-tunnel.ps1') -Value 'param($ConfigPath, $TunnelClient); $global:LocalOpsTestInitializedConfig = $ConfigPath; $global:LASTEXITCODE = 0'
     Set-Content -LiteralPath (Join-Path $fixtureScripts 'run-tunnel.ps1') -Value 'throw "The test must not start a real tunnel."'
@@ -47,6 +48,13 @@ try {
 
     $externalConfig = Test-Wizard $true
     $null = Test-Wizard $false
+    & {
+        function Read-Host { throw 'Reinitialize must not prompt to edit configuration.' }
+        $before = (Get-FileHash -LiteralPath $externalConfig).Hash
+        $global:LocalOpsTestInitializedConfig = $null
+        & (Join-Path $fixtureScripts 'first-time-setup.ps1') -ConfigPath $externalConfig -Reinitialize
+        Assert-True ($global:LocalOpsTestInitializedConfig -eq $externalConfig -and (Get-FileHash -LiteralPath $externalConfig).Hash -eq $before) 'Reinitialize edited or ignored the config.'
+    }
 
     & {
         function Read-Host { return '' }
@@ -54,6 +62,11 @@ try {
         $global:LocalOpsTestInitializedConfig = $null
         & (Join-Path $fixtureScripts 'first-time-setup.ps1') -ConfigPath $externalConfig -EditOnly
         Assert-True ($null -eq $global:LocalOpsTestInitializedConfig) 'Edit-only mode initialized a Tunnel.'
+        $conflicting = Join-Path (Split-Path $externalConfig) 'conflicting.psd1'
+        Set-Content -LiteralPath $conflicting -Value "@{ Profile = 'config-test'; TunnelId = 'tunnel_other' }"
+        & (Join-Path $fixtureScripts 'first-time-setup.ps1') -ConfigPath $externalConfig -EditOnly
+        $edited = Import-PowerShellDataFile -LiteralPath $externalConfig
+        Assert-True ($edited.Profile -ne 'config-test') 'Editing did not suggest an independent Profile.'
     }
     . (Join-Path $PSScriptRoot 'local-config.ps1')
     $newConfig = Join-Path $fixtureRoot 'new.psd1'
@@ -80,7 +93,8 @@ try {
             $index = [array]::IndexOf($arguments, '-ConfigPath')
             Assert-True ($index -ge 0) 'Launcher omitted ConfigPath.'
             Assert-True ($arguments[$index + 1] -eq ('"' + $SelectedConfig + '"')) 'Launcher did not preserve a config path containing spaces.'
-            Assert-True (($arguments -contains '-Reinitialize') -eq ($MenuChoice -eq '3')) 'Launcher changed reinitialization behavior.'
+            Assert-True (($arguments -contains '-EditOnly') -eq ($MenuChoice -eq '1')) 'Launcher mixed editing and initialization.'
+            if ($MenuChoice -eq '3') { Assert-True (($arguments -join ' ') -match 'setup-tunnel.ps1') 'Initialize did not use the setup script.' }
         } $choice $externalConfig (Join-Path $PSScriptRoot 'launcher.ps1')
     }
     Write-Host 'Config path tests passed (default wizard, external wizard, all launcher actions).'

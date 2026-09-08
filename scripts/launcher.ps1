@@ -4,6 +4,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Load the data-file function in script scope before nested status probes (Windows PowerShell -File).
+Import-Module Microsoft.PowerShell.Utility
+. (Join-Path $PSScriptRoot 'profile-state.ps1')
 
 $configurationPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ConfigPath)
 
@@ -21,12 +24,28 @@ if ($SelectConfig) {
         Write-Host "Directory: $configDirectory"
         for ($i = 0; $i -lt $configurations.Count; $i++) {
             Write-Host "[$($i + 1)] $($configurations[$i].Name)"
+            $preview = Get-LocalOpsConfigurationState -ConfigPath $configurations[$i].FullName
+            Write-Host "    Workspace: $($preview.Workspace) | Profile: $($preview.Profile)"
+            Write-Host "    [$($preview.Code)] $($preview.Message)"
         }
         Write-Host "[Enter] $([IO.Path]::GetFileName($configurationPath)) (default)"
         Write-Host '[Q] Quit'
+        Write-Host '[N] New configuration'
         while ($true) {
-            $answer = (Read-Host 'Choose configuration number, Enter for default, or Q').Trim()
+            $answer = (Read-Host 'Choose configuration number, N for new, Enter for default, or Q').Trim()
             if ($answer -ieq 'q') { return }
+            if ($answer -ieq 'n') {
+                $name = (Read-Host 'New configuration filename (without directory), or Q to cancel').Trim()
+                if ($name -ieq 'q') { continue }
+                if (-not $name -or $name -match '[\x00-\x1f<>:"/\\|?*]' -or $name -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)' -or $name.EndsWith('.') -or $name.StartsWith('.')) {
+                    Write-Host 'Use a plain filename, without directories or reserved characters.'; continue
+                }
+                if (-not $name.EndsWith('.psd1', [StringComparison]::OrdinalIgnoreCase)) { $name += '.psd1' }
+                $candidate = Join-Path $configDirectory $name
+                if ($name -like '*.example.psd1' -or (Test-Path -LiteralPath $candidate)) { Write-Host 'Choose a new name that is not a template.'; continue }
+                $configurationPath = $candidate
+                break
+            }
             if (-not $answer) { break }
             $number = 0
             if ([int]::TryParse($answer, [ref]$number) -and $number -ge 1 -and $number -le $configurations.Count) {
@@ -36,12 +55,12 @@ if ($SelectConfig) {
             Write-Host 'Invalid configuration number. Try again.' -ForegroundColor Yellow
         }
     } else {
-        Write-Host 'No saved configurations found. Choose first-time setup to create the default configuration.' -ForegroundColor Yellow
+        Write-Host 'No saved configurations found. Choose Create or edit configuration to create the default configuration.' -ForegroundColor Yellow
     }
 }
-$zhFirstTimeSetup = -join [char[]](0x9996, 0x6B21, 0x914D, 0x7F6E)
+$zhFirstTimeSetup = -join [char[]](0x65B0, 0x5EFA, 0x2F, 0x7F16, 0x8F91, 0x914D, 0x7F6E)
 $zhStart = -join [char[]](0x542F, 0x52A8)
-$zhReinitialize = -join [char[]](0x91CD, 0x65B0, 0x521D, 0x59CB, 0x5316, 0x914D, 0x7F6E)
+$zhReinitialize = -join [char[]](0x521D, 0x59CB, 0x5316, 0x96A7, 0x9053)
 $zhQuit = -join [char[]](0x9000, 0x51FA)
 $zhChooseAction = -join [char[]](0x8BF7, 0x9009, 0x62E9, 0x64CD, 0x4F5C)
 
@@ -94,9 +113,12 @@ Write-Host ''
 Write-Host 'Local Ops' -ForegroundColor Cyan
 Write-Host '========='
 Write-Host "Config: $configurationPath"
-Write-Host "[1] $zhFirstTimeSetup / First-time setup"
+$selectedState = Get-LocalOpsConfigurationState -ConfigPath $configurationPath
+Write-Host "Workspace: $($selectedState.Workspace) | Profile: $($selectedState.Profile)"
+Write-Host "[$($selectedState.Code)] $($selectedState.Message)"
+Write-Host "[1] $zhFirstTimeSetup / Create or edit configuration"
 Write-Host "[2] $zhStart Tunnel / Start Tunnel"
-Write-Host "[3] $zhReinitialize / Reinitialize configuration"
+Write-Host "[3] $zhReinitialize / Initialize Tunnel (keep configuration)"
 Write-Host "[Q] $zhQuit / Quit"
 Write-Host ''
 
@@ -104,7 +126,7 @@ $selection = (Read-Host "$zhChooseAction / Choose an action [1/2/3/Q]").Trim()
 
 switch ($selection) {
     '1' {
-        Start-LocalOpsPowerShell -Title 'First-time setup' -ScriptName 'first-time-setup.ps1'
+        Start-LocalOpsPowerShell -Title 'Edit configuration' -ScriptName 'first-time-setup.ps1' -ScriptArguments '-EditOnly'
     }
     '2' {
         if (Confirm-LocalConfiguration) {
@@ -113,7 +135,7 @@ switch ($selection) {
     }
     '3' {
         if (Confirm-LocalConfiguration) {
-            Start-LocalOpsPowerShell -Title 'Reinitialize configuration' -ScriptName 'first-time-setup.ps1' -ScriptArguments '-Reinitialize'
+            Start-LocalOpsPowerShell -Title 'Initialize Tunnel' -ScriptName 'setup-tunnel.ps1'
         }
     }
     { $_ -in @('q', 'Q') } {

@@ -13,6 +13,12 @@ $setupScript = Join-Path $PSScriptRoot 'setup-tunnel.ps1'
 $runScript = Join-Path $PSScriptRoot 'run-tunnel.ps1'
 . (Join-Path $PSScriptRoot 'tunnel-client.ps1')
 . (Join-Path $PSScriptRoot 'local-config.ps1')
+. (Join-Path $PSScriptRoot 'profile-state.ps1')
+if ($Reinitialize) {
+    if ($EditOnly) { throw 'Choose EditOnly or Reinitialize, not both.' }
+    & $setupScript -ConfigPath $configPath
+    return
+}
 
 function Read-RequiredValue {
     param(
@@ -107,7 +113,18 @@ elseif ($proxyInput) {
     $proxyUrl = $proxyInput
 }
 
-$profile = Read-RequiredValue -Prompt 'Local tunnel profile name' -DefaultValue $(if ($existing.Profile) { $existing.Profile } else { 'local-ops' })
+$defaultProfile = if ($existing.Profile) { $existing.Profile } else { Get-LocalOpsDefaultProfile -ConfigPath $configPath -TunnelId $tunnelId }
+$existingBinding = Get-LocalOpsProfileState -Profile $defaultProfile -TunnelId $tunnelId -TunnelClient $tunnelClient
+if ($existingBinding.Code -eq 'Mismatch' -or $defaultProfile -cnotmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$' -or @(Get-LocalOpsProfileConflicts -ConfigPath $configPath -Profile $defaultProfile -TunnelId $tunnelId).Count) {
+    Write-Host 'This Profile is invalid or used by another Tunnel. A separate name is suggested below.' -ForegroundColor Yellow
+    $defaultProfile = Get-LocalOpsDefaultProfile -ConfigPath $configPath -TunnelId $tunnelId
+}
+while ($true) {
+    $profile = Read-RequiredValue -Prompt 'Local tunnel profile name' -DefaultValue $defaultProfile
+    if ($profile -cnotmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$') { Write-Host 'Use 1-64 letters, digits, underscores, dots or hyphens, starting with a letter or digit.'; continue }
+    if (@(Get-LocalOpsProfileConflicts -ConfigPath $configPath -Profile $profile -TunnelId $tunnelId).Count) { Write-Host 'Another configuration uses this Profile for a different Tunnel. Choose another name.'; continue }
+    break
+}
 
 $nodePath = $existing.NodePath
 if ($nodePath -and -not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {

@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'tunnel-client.ps1')
+. (Join-Path $PSScriptRoot 'profile-state.ps1')
 $config = @{}
 if (Test-Path -LiteralPath $ConfigPath) {
     $config = Import-PowerShellDataFile -LiteralPath $ConfigPath
@@ -22,6 +23,17 @@ if (-not $Profile) { $Profile = 'local-ops' }
 
 $workspace = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
 $client = Resolve-TunnelClient -ExplicitPath $TunnelClient
+
+$conflicts = @(Get-LocalOpsProfileConflicts -ConfigPath $ConfigPath -Profile $Profile -TunnelId $config.TunnelId)
+if ($conflicts.Count) { throw "Profile is shared by different Tunnels ($($conflicts -join ', ')). Use Edit configuration to choose an independent Profile." }
+$binding = Get-LocalOpsProfileState -Profile $Profile -TunnelId $config.TunnelId -TunnelClient $client
+if ($binding.Code -eq 'Missing') {
+    $initialize = Read-Host 'This Profile needs initialization. Initialize the selected configuration now? [y/N]'
+    if ($initialize -notmatch '^[Yy]$') { return }
+    & (Join-Path $PSScriptRoot 'setup-tunnel.ps1') -ConfigPath $ConfigPath -WorkspaceRoot $WorkspaceRoot -Profile $Profile -ProxyUrl $ProxyUrl -TunnelClient $client
+    $binding = Get-LocalOpsProfileState -Profile $Profile -TunnelId $config.TunnelId -TunnelClient $client
+}
+if ($binding.Code -ne 'Ready') { throw $binding.Message }
 
 if (-not $env:CONTROL_PLANE_API_KEY) {
     $secureKey = Read-Host 'Runtime API key' -AsSecureString
@@ -47,5 +59,5 @@ if ($ProxyUrl) {
     Remove-Item Env:TUNNEL_CLIENT_HTTP_PROXY -ErrorAction SilentlyContinue
     Remove-Item Env:CONTROL_PLANE_HTTP_PROXY -ErrorAction SilentlyContinue
 }
-& $client run --profile $Profile
+& $client run --profile-file $binding.Path --control-plane.tunnel-id $config.TunnelId
 exit $LASTEXITCODE

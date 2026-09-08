@@ -92,7 +92,7 @@ Hosted Chat 无法直接启动本机 STDIO 进程。OpenAI Secure MCP Tunnel 可
 
 1. 准备 Node.js 20、一个明确授权的本地项目目录，以及官方 `tunnel-client`。
 2. 在 OpenAI Platform 创建 Tunnel，为它选择目标 `ChatGPT workspace`，并创建具备 Tunnels Read + Use 权限的 Runtime API Key。
-3. 双击仓库根目录的 `Local-Ops.bat`，选择 `1. First-time setup` 完成首次配置。
+3. 双击仓库根目录的 `Local-Ops.bat`，选择 `1. Create or edit configuration` 保存配置；再次打开菜单选择 `3. Initialize Tunnel`，成功后选择 `2. Start Tunnel`。编辑和初始化是独立操作，初始化不会改写配置。
 4. 再选择 `2. Start Tunnel` 并保持窗口开启。
 5. 在 ChatGPT 开发者模式中创建 Tunnel 连接的应用，从“可用隧道”列表选择对应 Tunnel，然后先执行一次只读目录测试。
 
@@ -107,7 +107,7 @@ Hosted Chat 无法直接启动本机 STDIO 进程。OpenAI Secure MCP Tunnel 可
 ## 配置与密钥
 
 - `config/local-ops.example.psd1`：可提交的脱敏模板；
-- `config/local-ops.psd1`：每台电脑单独生成的真实配置，已被 Git 忽略；
+- `config/*.psd1`（模板除外）：每台电脑单独生成的真实配置，已被 Git 忽略；
 - Runtime API Key：不保存在仓库中，脚本需要时临时询问；
 - `.mcp.json`：本地插件入口，安装前应确认 `LOCAL_OPS_ROOT` 指向预期工作区。
 

@@ -11,6 +11,8 @@ bin/tunnel-client.exe
 .env.*
 !.env.example
 config/local-ops.psd1
+config/*.psd1
+!config/local-ops.example.psd1
 
 # Editor and operating-system files
 .obsidian/

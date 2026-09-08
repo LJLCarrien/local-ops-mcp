@@ -36,3 +36,4 @@ jobs:
         run: |
           ./scripts/test-config-path.ps1
           ./scripts/test-config-selection.ps1
+          ./scripts/test-profile-state.ps1
