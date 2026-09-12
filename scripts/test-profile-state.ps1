@@ -73,13 +73,14 @@ $global:LASTEXITCODE = 0
     $configPath = Join-Path $fixture 'selected.psd1'
     $escaped = $fixture.Replace("'", "''")
     $node = (Join-Path $env:SystemRoot 'System32\cmd.exe').Replace("'", "''")
-    Set-Content -LiteralPath $configPath -Value "@{ WorkspaceRoot = '$escaped'; Profile = 'test'; TunnelId = 'tunnel_one'; NodePath = '$node'; GitWrite = `$false }"
+    Set-Content -LiteralPath $configPath -Value "@{ WorkspaceRoot = '$escaped'; Profile = 'test'; TunnelId = 'tunnel_one'; HealthListenAddr = '127.0.0.1:0'; NodePath = '$node'; GitWrite = `$false }"
     $configHash = (Get-FileHash -LiteralPath $configPath).Hash
     Assert-True ((Get-LocalOpsConfigurationState -ConfigPath $configPath -TunnelClient $fake).Code -eq 'Ready') 'Configuration status was not ready.'
     & (Join-Path $PSScriptRoot 'run-tunnel.ps1') -ConfigPath $configPath -TunnelClient $fake
     $run = Get-Content -LiteralPath (Join-Path $fixture 'run.json') -Raw | ConvertFrom-Json
     Assert-True ($run.workspace -eq $fixture -and $run.write -eq 'false') 'Run lost selected workspace or permissions.'
     Assert-True (($run.args -contains $yaml) -and ($run.args -contains '--control-plane.tunnel-id') -and ($run.args -contains 'tunnel_one')) 'Run did not pin the verified binding.'
+    Assert-True (($run.args -contains '--health.listen-addr') -and ($run.args -contains '127.0.0.1:0')) 'Run did not pass the selected health listener.'
     Remove-Item -LiteralPath (Join-Path $fixture 'run.json')
     Set-Content -LiteralPath $yaml -Value "control_plane:`n  tunnel_id: tunnel_other"
     Assert-Rejected { & (Join-Path $PSScriptRoot 'run-tunnel.ps1') -ConfigPath $configPath -TunnelClient $fake }
@@ -113,6 +114,10 @@ $global:LASTEXITCODE = 0
     Assert-True ($defaultOne -ne $defaultTwo -and $defaultOne -cmatch '^[a-z0-9][a-z0-9_-]{0,63}$') 'Default profiles are not distinct valid names.'
     Assert-True ((Get-LocalOpsDefaultProfile -ConfigPath '_workspace.psd1') -cmatch '^[a-z0-9][a-z0-9_-]{0,63}$') 'Leading underscore produced an invalid profile.'
     Assert-True ((Get-LocalOpsDefaultProfile -ConfigPath 'same.psd1' -TunnelId 'tunnel_one') -ne (Get-LocalOpsDefaultProfile -ConfigPath 'same.psd1' -TunnelId 'tunnel_two')) 'Different Tunnels got the same default profile.'
+    Assert-True (Test-LocalOpsHealthListenAddress -Address '127.0.0.1:0') 'Ephemeral loopback health listener was rejected.'
+    Assert-True (Test-LocalOpsHealthListenAddress -Address '127.0.0.1:8081') 'Fixed loopback health listener was rejected.'
+    Assert-True (-not (Test-LocalOpsHealthListenAddress -Address ':8081')) 'Network-visible health listener was accepted.'
+    Assert-True (-not (Test-LocalOpsHealthListenAddress -Address '127.0.0.1:65536')) 'Out-of-range health listener was accepted.'
     Write-Host 'Profile state, startup guards, initialization, and backup tests passed.'
 } finally {
     foreach ($name in $savedEnvironment.Keys) { [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name]) }

@@ -13,6 +13,16 @@ function Get-LocalOpsDefaultProfile {
     return "$slug-$hash"
 }
 
+function Test-LocalOpsHealthListenAddress {
+    param([string]$Address)
+
+    # The health endpoint exposes the local diagnostics UI. Keep it on loopback
+    # rather than accepting :PORT (which makes it reachable on every interface).
+    if ($Address -cnotmatch '^127\.0\.0\.1:(\d{1,5})$') { return $false }
+    $port = 0
+    return [int]::TryParse($Matches[1], [ref]$port) -and $port -ge 0 -and $port -le 65535
+}
+
 function Get-LocalOpsProfileConflicts {
     param([string]$ConfigPath, [string]$Profile, [string]$TunnelId)
     $absolute = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ConfigPath)
@@ -80,6 +90,9 @@ function Get-LocalOpsConfigurationState {
         $result.Workspace = [string]$config.WorkspaceRoot
         $result.Profile = if ($config.Profile) { [string]$config.Profile } else { 'local-ops' }
         if ($config.TunnelId -cnotmatch '^tunnel_[A-Za-z0-9]+$') { $result.Message = 'Set a valid TunnelId.'; return $result }
+        if ($config.ContainsKey('HealthListenAddr') -and -not (Test-LocalOpsHealthListenAddress -Address ([string]$config.HealthListenAddr))) {
+            $result.Message = 'Set HealthListenAddr to a loopback address such as 127.0.0.1:0 or 127.0.0.1:8081.'; return $result
+        }
         if (-not $result.Workspace -or -not (Test-Path -LiteralPath $result.Workspace -PathType Container)) {
             $result.Message = 'Workspace directory does not exist.'; return $result
         }

@@ -113,6 +113,13 @@ elseif ($proxyInput) {
     $proxyUrl = $proxyInput
 }
 
+$defaultHealthListenAddr = if ($existing.ContainsKey('HealthListenAddr')) { [string]$existing.HealthListenAddr } else { '127.0.0.1:0' }
+while ($true) {
+    $healthListenAddr = Read-RequiredValue -Prompt 'Local health address (127.0.0.1:0 lets Windows choose a free port)' -DefaultValue $defaultHealthListenAddr
+    if (Test-LocalOpsHealthListenAddress -Address $healthListenAddr) { break }
+    Write-Host 'Use a loopback address in the form 127.0.0.1:PORT. PORT may be 0 or a number from 1 to 65535.' -ForegroundColor Yellow
+}
+
 $defaultProfile = if ($existing.Profile) { $existing.Profile } else { Get-LocalOpsDefaultProfile -ConfigPath $configPath -TunnelId $tunnelId }
 $existingBinding = Get-LocalOpsProfileState -Profile $defaultProfile -TunnelId $tunnelId -TunnelClient $tunnelClient
 if ($existingBinding.Code -eq 'Mismatch' -or $defaultProfile -cnotmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$' -or @(Get-LocalOpsProfileConflicts -ConfigPath $configPath -Profile $defaultProfile -TunnelId $tunnelId).Count) {
@@ -141,7 +148,7 @@ if (-not $EditOnly -and $detectedNode -match '\s') {
 }
 
 Save-LocalOpsConfiguration -Path $configPath -Updates @{
-    WorkspaceRoot = $workspaceRoot; TunnelId = $tunnelId; ProxyUrl = $proxyUrl; Profile = $profile; NodePath = $nodePath
+    WorkspaceRoot = $workspaceRoot; TunnelId = $tunnelId; ProxyUrl = $proxyUrl; Profile = $profile; HealthListenAddr = $healthListenAddr; NodePath = $nodePath
 }
 
 Write-Host ''
@@ -150,6 +157,7 @@ Write-Host "Workspace: $workspaceRoot"
 Write-Host "Tunnel:    $tunnelId"
 Write-Host "Proxy:     $(if ($proxyUrl) { $proxyUrl } else { '(direct connection)' })"
 Write-Host "Profile:   $profile"
+Write-Host "Health:    $healthListenAddr"
 Write-Host ''
 if ($EditOnly) { Write-Host 'Configuration saved. Tunnel initialization was not run.'; return }
 Write-Host 'Starting tunnel initialization. Paste the Runtime API key when prompted.' -ForegroundColor Cyan

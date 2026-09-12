@@ -36,6 +36,7 @@ try {
         Assert-True ($saved.Profile -eq 'config-test') 'Wizard did not read the existing selected config.'
         Assert-True (-not $saved.GitRead -and -not $saved.GitWrite -and $saved.GitRemote -and -not $saved.GitFetch -and $saved.GitPull -and $saved.GitPush) 'Wizard reset Git permissions.'
         Assert-True ($saved.ProxyUrl -eq 'https://proxy.example.invalid:443') 'Wizard reset existing proxy URL.'
+        Assert-True ($saved.HealthListenAddr -eq '127.0.0.1:0') 'Wizard did not save the parallel-safe health listener.'
         Assert-True ($saved.Extra.Name -eq 'keep me') 'Wizard lost an unknown field.'
         Assert-True ((Get-Content -LiteralPath $targetConfig -Raw).Contains('# Keep this comment')) 'Wizard lost comments.'
         $backup = @(Get-ChildItem -LiteralPath (Split-Path $targetConfig) -Filter '*.bak')

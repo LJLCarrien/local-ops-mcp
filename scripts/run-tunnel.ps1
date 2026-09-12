@@ -1,6 +1,7 @@
 param(
     [string]$WorkspaceRoot,
     [string]$Profile,
+    [string]$HealthListenAddr,
     [string]$ProxyUrl,
     [string]$TunnelClient,
     [string]$ConfigPath = (Join-Path $PSScriptRoot '..\config\local-ops.psd1')
@@ -16,10 +17,15 @@ if (Test-Path -LiteralPath $ConfigPath) {
 
 if (-not $PSBoundParameters.ContainsKey('WorkspaceRoot')) { $WorkspaceRoot = $config.WorkspaceRoot }
 if (-not $PSBoundParameters.ContainsKey('Profile')) { $Profile = $config.Profile }
+if (-not $PSBoundParameters.ContainsKey('HealthListenAddr')) { $HealthListenAddr = $config.HealthListenAddr }
 if (-not $PSBoundParameters.ContainsKey('ProxyUrl')) { $ProxyUrl = $config.ProxyUrl }
 
 if (-not $WorkspaceRoot) { throw "WorkspaceRoot is missing. Set it in '$ConfigPath' or pass -WorkspaceRoot." }
 if (-not $Profile) { $Profile = 'local-ops' }
+if (-not $HealthListenAddr) { $HealthListenAddr = '127.0.0.1:8080' }
+if (-not (Test-LocalOpsHealthListenAddress -Address $HealthListenAddr)) {
+    throw "HealthListenAddr must be a loopback address such as 127.0.0.1:0 or 127.0.0.1:8081."
+}
 
 $workspace = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
 $client = Resolve-TunnelClient -ExplicitPath $TunnelClient
@@ -59,5 +65,5 @@ if ($ProxyUrl) {
     Remove-Item Env:TUNNEL_CLIENT_HTTP_PROXY -ErrorAction SilentlyContinue
     Remove-Item Env:CONTROL_PLANE_HTTP_PROXY -ErrorAction SilentlyContinue
 }
-& $client run --profile-file $binding.Path --control-plane.tunnel-id $config.TunnelId
+& $client run --profile-file $binding.Path --control-plane.tunnel-id $config.TunnelId --health.listen-addr $HealthListenAddr
 exit $LASTEXITCODE

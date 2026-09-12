@@ -40,11 +40,12 @@ Copy-Item .\config\local-ops.example.psd1 .\config\local-ops.psd1
     TunnelId     = 'tunnel_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
     ProxyUrl     = 'http://127.0.0.1:<PROXY_PORT>'
     Profile      = 'local-ops'
+    HealthListenAddr = '127.0.0.1:0'
     NodePath     = ''
 }
 ```
 
-不需要代理时将 `ProxyUrl` 留空。`NodePath` 通常也留空，让脚本自动检测。真实配置应由 Git 忽略。
+不需要代理时将 `ProxyUrl` 留空。`HealthListenAddr` 是仅本机使用的健康检查与诊断界面地址；推荐 `127.0.0.1:0`，让 Windows 为每个 Tunnel 自动分配空闲端口。`NodePath` 通常也留空，让脚本自动检测。真实配置应由 Git 忽略。
 
 ## 初始化一次
 
@@ -84,6 +85,12 @@ tunnel-client started
 ```
 
 使用期间保持窗口开启；按 `Ctrl+C` 可停止。
+
+## 同时运行多个 Tunnel
+
+每份配置都必须使用不同的 `TunnelId`、`Profile` 和 `WorkspaceRoot`。将每份配置的 `HealthListenAddr` 设为 `127.0.0.1:0` 后，可以分别启动它们：Windows 会为每个 tunnel-client 分配独立端口，避免默认 `127.0.0.1:8080` 的冲突。若需要固定端口，可使用不同的值，例如 `127.0.0.1:8080` 与 `127.0.0.1:8081`。
+
+健康端点只接受 `127.0.0.1:端口`，不能填 `:端口` 或局域网地址，以免将本机诊断界面暴露到网络。每个 ChatGPT 对话应选择绑定到相应 Tunnel ID 的连接器；Local Ops 仍会把该对话限制在所选配置的 `WorkspaceRoot` 内。
 
 ## 在 ChatGPT 中完成连接
 
@@ -131,6 +138,7 @@ tunnel-client started
 | `TunnelId` | OpenAI Platform 的 Tunnels 页面 | 回页面查看 `ID` 列 | 更换独立 Profile 并初始化 |
 | `ProxyUrl` | 代理软件的 HTTP/Mixed 端口 | 打开代理软件查看本地端口 | 重新启动 |
 | `Profile` | 自己起的本机配置昵称 | 使用向导建议的独立名称 | 新 Profile 需初始化 |
+| `HealthListenAddr` | 本机健康检查地址 | 推荐保留 `127.0.0.1:0`；固定端口时确保每份配置不同 | 重新启动 |
 | `NodePath` | Node.js 可执行文件路径 | 通常留空自动检测 | 重新初始化 |
 | Runtime API Key | OpenAI Platform 的 Runtime API Keys 页面 | 旧值通常不可找回，应新建并撤销旧密钥 | 在脚本提示时输入，不写入配置 |
 
@@ -149,6 +157,10 @@ tunnel-client started
 ### Profile 与 NodePath
 
 `Profile` 是本机 Tunnel 配置名称。向导根据配置文件名和 Tunnel ID 生成独立默认名；不同 Tunnel 不要共用同一个 Profile。`NodePath` 通常留空；自动检测失败时，可填写不含空格的 Node.js 可执行文件路径。
+
+### HealthListenAddr
+
+这是 tunnel-client 本机健康检查和诊断界面的监听地址，不影响 ChatGPT 的 Tunnel 地址。旧配置未设置时会继续使用官方客户端默认的 `127.0.0.1:8080`，一次只能运行一个 Tunnel；编辑配置并保存 `127.0.0.1:0` 后即可避免端口冲突。该项目只允许回环地址 `127.0.0.1`，避免意外对局域网开放诊断界面。
 
 ### Runtime API Key
 
@@ -206,7 +218,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\launcher.ps1 -
 
 绑定检查只接受官方 init 通常生成的简单字面量 YAML；自定义别名、合并、重复字段等无法可靠判断时显示 Unknown。启用了 TUNNEL_CLIENT_CONFIG 或 TUNNEL_CLIENT_PROFILE_FILE 环境覆盖时，也会提示先清除覆盖，避免检查和运行使用不同文件。启动及 doctor 命令显式传递已核对的 profile 文件和 Tunnel ID。
 
-可以准备 work.psd1、personal.psd1 等私人配置，每份填写各自的 WorkspaceRoot。菜单不会记住或覆盖默认选择，也不会停止已有进程；切换前先关闭旧 Tunnel 窗口。不加 SelectConfig 则直接使用 ConfigPath 指定的文件。
+可以准备 work.psd1、personal.psd1 等私人配置，每份填写各自的 WorkspaceRoot。菜单不会记住或覆盖默认选择，也不会停止已有进程。若只需切换使用，先关闭旧 Tunnel 窗口；若需要并行使用，则确保每份配置的 TunnelId、Profile 与 HealthListenAddr 都独立或使用 `127.0.0.1:0`。不加 SelectConfig 则直接使用 ConfigPath 指定的文件。
 
 编辑时代理输入回车保留现值，输入 none 清空。无效配置不会被覆盖。备份保存在原文件旁，文件名带时间和随机后缀并以 .bak 结尾；配置目录中的真实 psd1 文件和备份均被 Git 忽略，公开模板除外。
 
