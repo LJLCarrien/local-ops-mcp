@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, realpath, readdir, readFile, rename as renamePath, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, realpath, readdir, readFile, rename as renamePath, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -551,7 +551,11 @@ async function callTool(name, args = {}) {
     const directory = await resolveExisting(args.path);
     if (directory === root) throw new Error("workspace root cannot be deleted");
     if (!(await stat(directory)).isDirectory()) throw new Error("path is not a directory");
-    await rm(directory, { recursive: args.recursive === true, force: false });
+    if (args.recursive === true) {
+      await rm(directory, { recursive: true, force: false });
+    } else {
+      await rmdir(directory);
+    }
     return textResult(`deleted directory ${path.relative(root, directory)}`);
   }
 
