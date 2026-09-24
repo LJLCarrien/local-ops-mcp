@@ -42,7 +42,7 @@ Restart the Codex host and inspect its connected MCP servers to verify that thes
 
 - `list_directory`, `read_file`, `write_file`
 - `create_directory`, `delete_directory`
-- `delete_file`, `copy_file`, `move_file`, `rename_file`
+- `delete_file`, `copy_file`, `move_file`, `move_directory`, `rename_file`
 - `git_status`, `git_diff_unstaged`, `git_diff_staged`, `git_log`
 - `git_show`, `git_branch`, `git_add`, `git_commit`, `git_amend_message`
 - `git_fetch`, `git_pull`, `git_push` when their remote switches are enabled
@@ -56,7 +56,7 @@ Example `config.toml` entry:
 command = "node"
 args = ["C:\\absolute\\path\\to\\local-ops-mcp\\server.mjs"]
 env = { LOCAL_OPS_ROOT = "D:\\Projects\\allowed-workspace", LOCAL_OPS_GIT_READ = "true", LOCAL_OPS_GIT_WRITE = "true", LOCAL_OPS_GIT_REMOTE = "false", LOCAL_OPS_GIT_FETCH = "true", LOCAL_OPS_GIT_PULL = "false", LOCAL_OPS_GIT_PUSH = "false" }
-enabled_tools = ["list_directory", "read_file", "write_file", "create_directory", "delete_directory", "delete_file", "copy_file", "move_file", "rename_file", "git_status", "git_diff_unstaged", "git_diff_staged", "git_log", "git_show", "git_branch", "git_add", "git_commit", "git_amend_message", "git_fetch", "git_pull", "git_push"]
+enabled_tools = ["list_directory", "read_file", "write_file", "create_directory", "delete_directory", "delete_file", "copy_file", "move_file", "move_directory", "rename_file", "git_status", "git_diff_unstaged", "git_diff_staged", "git_log", "git_show", "git_branch", "git_add", "git_commit", "git_amend_message", "git_fetch", "git_pull", "git_push"]
 default_tools_approval_mode = "writes"
 ```
 

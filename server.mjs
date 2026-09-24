@@ -311,6 +311,20 @@ const allTools = [
     annotations: { readOnlyHint: false, destructiveHint: true }
   },
   {
+    name: "move_directory",
+    description: "Move a directory and all of its contents to a new workspace-relative path. The destination must not already exist and cannot be inside the source directory.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source: { type: "string", description: "Workspace-relative source directory path; the workspace root cannot be moved" },
+        destination: { type: "string", description: "Workspace-relative destination directory path; parent directory must exist" }
+      },
+      required: ["source", "destination"],
+      additionalProperties: false
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true }
+  },
+  {
     name: "rename_file",
     description: "Rename a regular file without moving it to another directory. The new name must not already exist.",
     inputSchema: {
@@ -574,6 +588,19 @@ async function callTool(name, args = {}) {
     if (source === destination) throw new Error("source and destination must be different");
     await renamePath(source, destination);
     return textResult(`moved ${path.relative(root, source)} to ${path.relative(root, destination)}`);
+  }
+
+  if (name === "move_directory") {
+    const source = await resolveExisting(args.source);
+    if (source === root) throw new Error("workspace root cannot be moved");
+    if (!(await stat(source)).isDirectory()) throw new Error("source is not a directory");
+    const destination = await resolveNewFileDestination(args.destination);
+    const relativeDestination = path.relative(source, destination);
+    if (relativeDestination && !relativeDestination.startsWith("..") && !path.isAbsolute(relativeDestination)) {
+      throw new Error("destination cannot be inside the source directory");
+    }
+    await renamePath(source, destination);
+    return textResult(`moved directory ${path.relative(root, source)} to ${path.relative(root, destination)}`);
   }
 
   if (name === "rename_file") {

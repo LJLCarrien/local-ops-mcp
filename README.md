@@ -36,7 +36,7 @@ Local Ops MCP
 
 - 浏览：`list_directory`、`read_file`
 - 写入：`write_file`、`create_directory`
-- 整理：`copy_file`、`move_file`、`rename_file`
+- 整理：`copy_file`、`move_file`、`move_directory`、`rename_file`
 - 删除：`delete_file`、`delete_directory`
 - Git 只读：`git_status`、`git_diff_unstaged`、`git_diff_staged`、`git_log`、`git_show`、`git_branch`
 - Git 写入：`git_add`、`git_commit`、`git_amend_message`

@@ -43,6 +43,7 @@ assert.deepEqual(listed.tools.map((tool) => tool.name), [
   "delete_file",
   "copy_file",
   "move_file",
+  "move_directory",
   "rename_file",
   "git_status",
   "git_diff_unstaged",
@@ -84,6 +85,20 @@ assert.equal(await readFile(path.join(root, "copy.txt"), "utf8"), "new source");
 const moved = await request("tools/call", { name: "move_file", arguments: { source: "copy.txt", destination: "moved.txt" } });
 assert.equal(moved.isError, undefined);
 await assert.rejects(access(path.join(root, "copy.txt")));
+await request("tools/call", { name: "create_directory", arguments: { path: "directory-source/nested", recursive: true } });
+await writeFile(path.join(root, "directory-source", "nested", "file.txt"), "nested", "utf8");
+const movedDirectory = await request("tools/call", { name: "move_directory", arguments: { source: "directory-source", destination: "directory-destination" } });
+assert.equal(movedDirectory.isError, undefined);
+await assert.rejects(access(path.join(root, "directory-source")));
+assert.equal(await readFile(path.join(root, "directory-destination", "nested", "file.txt"), "utf8"), "nested");
+await request("tools/call", { name: "create_directory", arguments: { path: "second-directory", recursive: false } });
+const refusedExistingDestination = await request("tools/call", { name: "move_directory", arguments: { source: "second-directory", destination: "directory-destination" } });
+assert.equal(refusedExistingDestination.isError, true);
+const refusedMoveRoot = await request("tools/call", { name: "move_directory", arguments: { source: ".", destination: "moved-root" } });
+assert.equal(refusedMoveRoot.isError, true);
+await request("tools/call", { name: "create_directory", arguments: { path: "nested-source", recursive: false } });
+const refusedNestedDestination = await request("tools/call", { name: "move_directory", arguments: { source: "nested-source", destination: "nested-source/child" } });
+assert.equal(refusedNestedDestination.isError, true);
 const renamed = await request("tools/call", { name: "rename_file", arguments: { path: "moved.txt", new_name: "renamed.txt" } });
 assert.equal(renamed.isError, undefined);
 await assert.rejects(access(path.join(root, "moved.txt")));
